@@ -138,8 +138,7 @@ class HFModelRunner(object):
         elif self.model_name in ['vilt-coco', 'vilt-f30k']:
 
             # Define and preprocess the text
-            ### TODO: Requires truncation in some cases
-            encoding = self.processor(image, text, return_tensors="pt", max_length=40, truncation=True)
+            encoding = self.processor(image, text, return_tensors="pt")
     
             # Run through model
             with torch.no_grad():
@@ -173,6 +172,7 @@ class HFModelRunner(object):
 
         for index, row in tqdm(self.df.iterrows(), total=self.df.shape[0]):
             text = row['condition']
+
             for cond in ['afforded_image', 'non-afforded_image', 'related_image']:
 
                 ## Get image path
@@ -203,6 +203,7 @@ class HFModelRunner(object):
                     'num_params': self.num_params
                 })
 
+
         # Turn results into DataFrame
         self.df_results = pd.DataFrame(results)
         
@@ -215,16 +216,16 @@ class HFModelRunner(object):
 
 ### TODO: BLIP weights not initialized?
 
-models_to_run = [#'align-base',
-                # 'clip-vit-base-patch32',
-                # 'clip-vit-large-patch14',
-                # 'flava-full',
-                # 'clip-huge-14',
-                # 'clip-giant',
-                # 'clip-big-giant',
-                # 'vilt-coco',
+models_to_run = ['align-base',
+                'clip-vit-base-patch32',
+                'clip-vit-large-patch14',
+                'flava-full',
+                'clip-huge-14',
+                'clip-giant',
+                'clip-big-giant',
+                'vilt-coco',
                 'vilt-f30k',
-                # 'bridgetower'
+                'bridgetower'
                 ]
 for model_name in models_to_run:
     print(model_name)

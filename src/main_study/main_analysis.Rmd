@@ -1,0 +1,680 @@
+---
+title: "Multimodal Models and Affordances"
+date: "September 12, 2024"
+output:
+  # pdf_document: 
+  #    fig_caption: yes
+  #    keep_md: yes
+  #    keep_tex: yes
+  html_document:
+     keep_md: yes
+     toc: yes
+     toc_float: yes
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(dpi = 300, fig.format = "pdf")
+```
+
+```{r include=FALSE}
+library(tidyverse)
+library(lmtest)
+library(forcats)
+library(broom)
+library(lme4)
+library(ggridges)
+library(lmerTest)
+library(broom.mixed)
+library(ggrepel)
+library(tools)
+library(viridis)
+
+library(ggcorrplot)
+
+all_colors <- viridis::viridis(10, option = "mako")
+my_colors <- all_colors[c(3, 5, 7)]  # Selecting specific colors from the palette
+```
+
+
+# Load data
+
+## Open HuggingFace models
+
+```{r}
+# setwd("/Users/seantrott/Dropbox/UCSD/Research/NLMs/vlm_affordances/src/main_study/")
+directory_path <- "../../data/processed/models/hf_models/"
+csv_files <- list.files(path = directory_path, pattern = "*.csv", full.names = TRUE)
+csv_list <- csv_files %>%
+  map(~ read_csv(.))
+df_hf_models <- bind_rows(csv_list)
+
+df_hf_models = df_hf_models %>%
+  mutate(condition = str_to_title(sub("_.*", "", condition))) 
+
+table(df_hf_models$model_name)
+```
+
+## Load closed-source models
+
+```{r}
+directory_path <- "../../data/processed/models/closed_models//"
+csv_files <- list.files(path = directory_path, pattern = "*.csv", full.names = TRUE)
+csv_list <- csv_files %>%
+  map(~ read_csv(.))
+df_closed_models <- bind_rows(csv_list)
+
+df_closed_models = df_closed_models %>%
+  mutate(condition = str_to_title(sub("_.*", "", condition)))
+
+table(df_closed_models$model_name)
+```
+
+## Merge
+
+```{r}
+df_merged = df_hf_models %>%
+  bind_rows(df_closed_models) %>%
+  group_by(model_name, version) %>%
+  mutate(response_z = scale(response))
+
+df_merged$response_z <- as.numeric(unlist(df_merged$response_z))
+
+
+### Z-score response
+df_hf_models = df_hf_models %>%
+  group_by(model_name, version) %>%
+  mutate(response_z = scale(response))
+```
+
+
+
+# Confirmatory Analyses
+
+```{r}
+
+### Average z-scored response
+df_summary <- df_merged %>%
+  group_by(condition, model_name, num_params) %>%
+  summarize(avg_response = mean(response_z, na.rm = TRUE),
+            se_response = sd(response_z, na.rm = TRUE) / sqrt(n()))
+
+### Plot avg z-scored response by condition
+ggplot(df_summary, aes(x = model_name,
+                       y = avg_response, 
+                       color = condition, group = condition)) +
+  geom_point(size = 3, 
+             position = position_dodge(width = 0.5)) +  
+  geom_errorbar(aes(ymin = avg_response - se_response, 
+                    ymax = avg_response + se_response), 
+                width = 0.2,
+                position = position_dodge(width = 0.5)) + 
+  labs(# title = "",
+       x = "",
+       y = "Z-scored Response",
+       color = "") +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom")
+
+ggplot(df_merged, aes(x = model_name, y = response_z, color = condition)) +
+  # Plot raw data points with slight jitter for better visibility
+  geom_jitter(size = 1, width = 0.2, height = 0, alpha = 0.1) +
+  # Plot the means
+  stat_summary(
+    fun = mean,
+    geom = "point",
+    size = 3,
+    position = position_dodge(width = 0.5)
+  ) +
+  # Plot the error bars (standard error)
+  stat_summary(
+    fun.data = mean_se,  # Calculate mean and standard error
+    geom = "errorbar",
+    width = 0.2,
+    position = position_dodge(width = 0.5)
+  ) +
+  # Aesthetic adjustments
+  labs(
+    x = "",
+    y = "Z-scored Response",
+    color = ""
+  ) +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  theme(
+    axis.title = element_text(size = rel(1.2)),
+    axis.text = element_text(size = rel(1.2)),
+    legend.text = element_text(size = rel(1.2)),
+    strip.text.x = element_text(size = rel(1.2)),
+    legend.position = "bottom"
+  )
+
+```
+
+
+
+## Afforded (non-canonical) vs. Non-Afforded 
+
+
+```{r}
+# Define a function to fit the full and reduced lmer models and return the tidy summaries and LRT p-values
+fit_and_tidy_lmer_model_with_lrt <- function(df) {
+  # Fit the full mixed model
+  full_model_fit <- lmer(response_z ~ condition + prompt_type + version + (1 | group_id), 
+                         data = filter(df, condition != "Related"), 
+                         REML = FALSE)
+  
+  # Fit the reduced mixed model (without condition)
+  reduced_model_fit <- lmer(response_z ~ prompt_type + version + (1 | group_id), 
+                            data = filter(df, condition != "Related"), 
+                            REML = FALSE)
+  
+  # Perform the likelihood ratio test between the full and reduced models
+  lrt_result <- anova(reduced_model_fit, full_model_fit)
+  lrt_p_value <- lrt_result$`Pr(>Chisq)`[2]  # Extract the p-value for the comparison
+  
+  # Tidy the full model (extracting coefficients, p-values, etc.)
+  model_tidy <- tidy(full_model_fit)
+  
+  # Return the model fit, tidy dataframe, and LRT p-value
+  list(full_model_fit = full_model_fit, 
+       reduced_model_fit = reduced_model_fit, 
+       model_tidy = model_tidy, 
+       lrt_p_value = lrt_p_value)
+}
+
+# Apply the function to each model_name group
+model_results <- df_merged %>%
+  group_by(model_name) %>%
+  nest() %>%  # Nest data by model_name
+  mutate(model_info = map(data, fit_and_tidy_lmer_model_with_lrt))  # Fit the models and get tidy output and LRT
+
+# Extract the model fits, tidy dataframes, and LRT p-values for each model
+model_fits <- model_results %>%
+  mutate(full_model_fit = map(model_info, "full_model_fit"),
+         reduced_model_fit = map(model_info, "reduced_model_fit"),
+         model_tidy = map(model_info, "model_tidy"),
+         lrt_p_value = map_dbl(model_info, "lrt_p_value"))  # Extract LRT p-values
+
+# If you want to unnest the tidy summaries into one dataframe:
+tidy_results <- model_fits %>%
+  unnest(model_tidy)
+
+# Filtering and plotting the results for the "conditionNon-Afforded" term
+tidy_results %>%
+  filter(term == "conditionNon-Afforded") %>%
+  ggplot(aes(x = reorder(model_name, estimate),
+             y = estimate)) +
+  geom_point(size = 3, alpha = .6) +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  geom_errorbar(aes(ymin = estimate - 2*std.error, 
+                    ymax = estimate + 2*std.error), 
+                alpha = .2,
+                width=.2) + 
+  labs(x = "Predictor",
+       y = "Estimate",
+       title = "Non-Afforded vs. Afforded") +
+  theme_minimal()
+
+# Extract just the results for "conditionNon-Afforded"
+just_condition <- tidy_results %>%
+  filter(term == "conditionNon-Afforded") 
+
+# Create final dataframe
+
+final_df <- data.frame(
+  model = just_condition$model_name,
+  original_p = just_condition$p.value,
+  adjusted_p_holm = p.adjust(just_condition$p.value, method = "holm"),
+  lrt_p_value = model_fits$lrt_p_value,
+  adjusted_p_lrt_holm = p.adjust(model_fits$lrt_p_value, method = "holm")
+) %>%
+  mutate(lrt_sig = adjusted_p_lrt_holm < .05)
+
+final_df %>%
+  filter(lrt_sig == TRUE)
+```
+
+
+## Related (canonical) vs. Non-Afforded 
+
+```{r}
+fit_and_tidy_lmer_model_with_lrt <- function(df) {
+  # Fit the full mixed model
+  full_model_fit <- lmer(response_z ~ condition + prompt_type + version + (1 | group_id), 
+                         data = filter(df, condition != "Afforded"), 
+                         REML = FALSE)
+  
+  # Fit the reduced mixed model (without condition)
+  reduced_model_fit <- lmer(response_z ~ prompt_type + version + (1 | group_id), 
+                            data = filter(df, condition != "Afforded"), 
+                            REML = FALSE)
+  
+  # Perform the likelihood ratio test between the full and reduced models
+  lrt_result <- anova(reduced_model_fit, full_model_fit)
+  lrt_p_value <- lrt_result$`Pr(>Chisq)`[2]  # Extract the p-value for the comparison
+  
+  # Tidy the full model (extracting coefficients, p-values, etc.)
+  model_tidy <- tidy(full_model_fit)
+  
+  # Return the model fit, tidy dataframe, and LRT p-value
+  list(full_model_fit = full_model_fit, 
+       reduced_model_fit = reduced_model_fit, 
+       model_tidy = model_tidy, 
+       lrt_p_value = lrt_p_value)
+}
+
+# Apply the function to each model_name group
+model_results <- df_merged %>%
+  group_by(model_name) %>%
+  nest() %>%  # Nest data by model_name
+  mutate(model_info = map(data, fit_and_tidy_lmer_model_with_lrt))  # Fit the models and get tidy output and LRT
+
+# Extract the model fits, tidy dataframes, and LRT p-values for each model
+model_fits <- model_results %>%
+  mutate(full_model_fit = map(model_info, "full_model_fit"),
+         reduced_model_fit = map(model_info, "reduced_model_fit"),
+         model_tidy = map(model_info, "model_tidy"),
+         lrt_p_value = map_dbl(model_info, "lrt_p_value"))  # Extract LRT p-values
+
+# If you want to unnest the tidy summaries into one dataframe:
+tidy_results <- model_fits %>%
+  unnest(model_tidy)
+
+# Filtering and plotting the results for the "conditionNon-Afforded" term
+tidy_results %>%
+  filter(term == "conditionRelated") %>%
+  ggplot(aes(x = reorder(model_name, estimate),
+             y = estimate)) +
+  geom_point(size = 3, alpha = .6) +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  geom_errorbar(aes(ymin = estimate - 2*std.error, 
+                    ymax = estimate + 2*std.error), 
+                alpha = .2,
+                width=.2) + 
+  labs(x = "Predictor",
+       y = "Estimate",
+       title = "Non-Afforded vs. Afforded") +
+  theme_minimal()
+
+# Extract just the results for "conditionNon-Afforded"
+just_condition <- tidy_results %>%
+  filter(term == "conditionRelated") 
+
+# Create final dataframe
+
+final_df <- data.frame(
+  model = just_condition$model_name,
+  original_p = just_condition$p.value,
+  adjusted_p_holm = p.adjust(just_condition$p.value, method = "holm"),
+  lrt_p_value = model_fits$lrt_p_value,
+  adjusted_p_lrt_holm = p.adjust(model_fits$lrt_p_value, method = "holm")
+) %>%
+  mutate(lrt_sig = adjusted_p_lrt_holm < .05)
+
+final_df %>%
+  filter(lrt_sig == TRUE)
+```
+
+
+# Exploratory Analyses
+
+## Closed-source models
+
+Although both GPTs show an effect *on average* between Afforded and Non-Afforded, they do assign a rating of "1" to many Afforded items.
+
+```{r}
+df_closed_models %>%
+  ggplot(aes(x = response, fill = condition)) +
+  geom_bar(stat = "count") +
+  theme_minimal() +
+  facet_wrap(~model_name + condition) +
+  scale_fill_viridis_d() +
+  labs(x = "Response") +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "none")
+```
+
+
+## Accuracy
+
+A slightly different distribution of models is found when you compare the *average difference* between Afforded vs. Non-Afforded as opposed to the *proportion of items in which Afforded > Non-Afforded* (how "accuracy" is operationalized here).
+
+```{r}
+
+df_accuracy = df_merged %>%
+  select(condition, response_z, group_id, text, 
+         model_name, prompt_type) %>%
+  #filter(condition != "Related") %>%
+  pivot_wider(
+    names_from = condition,
+    values_from = c(response_z),
+    names_prefix = "condition_"
+  ) %>%
+  mutate(diff_main = condition_Afforded - `condition_Non-Afforded`,
+         diff_manipulation_check = condition_Related -`condition_Non-Afforded`) %>%
+  mutate(accuracy_main = diff_main > 0,
+         accuracy_manipulation_check = diff_manipulation_check > 0)
+  
+
+df_accuracy %>%
+  ggplot(aes(x = group_id, y = diff_main)) +
+  geom_bar(stat = "identity") +
+  # geom_vline(xintercept = 0, linetype = "dotted") +
+  facet_wrap(~model_name) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  labs(x = "Item Number",
+       y = "Difference (Afforded vs. Non-Afforded)") +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "none")
+
+
+mean(df_accuracy$accuracy_main)
+mean(df_accuracy$accuracy_manipulation_check)
+
+
+summary(df_accuracy$diff_main)
+sd(df_accuracy$diff_main)
+summary(df_accuracy$diff_manipulation_check)
+sd(df_accuracy$diff_manipulation_check)
+  
+
+accuracy_by_model = df_accuracy %>%
+  group_by(model_name) %>%
+  summarise(avg_accuracy_main = mean(accuracy_main),
+            avg_accuracy_manipulation = mean(accuracy_manipulation_check))
+accuracy_by_model
+
+
+accuracy_by_model %>%
+  ggplot(aes(x = reorder(model_name, avg_accuracy_main),
+             y = avg_accuracy_main)) +
+  geom_bar(stat = "identity") +
+  scale_fill_viridis_d() +
+  labs(x = "Model",
+       y = "Accuracy (Afforded vs. Non-Afforded)") +
+  coord_flip() +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, 1)) +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "none")
+
+accuracy_by_model %>%
+  ggplot(aes(x = reorder(model_name, avg_accuracy_main),
+             y = avg_accuracy_manipulation)) +
+  geom_bar(stat = "identity") +
+  scale_fill_viridis_d() +
+  labs(x = "Model",
+       y = "Accuracy (Canonical vs. Non-Afforded)") +
+  coord_flip() +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, 1)) +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "none")
+
+```
+
+### Item-wise effects (main contrast)
+
+We see clear groups of correlations.
+
+```{r}
+### reshape data
+df_wide <- df_accuracy %>%
+  group_by(model_name, group_id) %>%
+  summarise(avg_diff_main = mean(diff_main)) %>%
+  select(group_id, model_name, avg_diff_main) %>%
+  pivot_wider(names_from = c(model_name),
+              values_from = avg_diff_main)
+
+cols = df_wide %>%
+  select(-group_id)
+cor_matrix <- cor(cols, use = "complete.obs")
+print(cor_matrix)
+
+# Plot the correlation matrix
+ggcorrplot(cor_matrix, 
+           hc.order = TRUE,
+           method = "square" 
+          )
+
+
+```
+
+### Item-wise effects (manipulation check contrast)
+
+We see clear groups of correlations.
+
+```{r}
+### reshape data
+df_wide <- df_accuracy %>%
+  group_by(model_name, group_id) %>%
+  summarise(avg_diff_manipulation = mean(diff_manipulation_check)) %>%
+  select(group_id, model_name, avg_diff_manipulation) %>%
+  pivot_wider(names_from = c(model_name),
+              values_from = avg_diff_manipulation)
+
+cols = df_wide %>%
+  select(-group_id)
+cor_matrix <- cor(cols, use = "complete.obs")
+print(cor_matrix)
+
+# Plot the correlation matrix
+ggcorrplot(cor_matrix, 
+           hc.order = TRUE,
+           method = "square" 
+          )
+
+
+```
+## Cross-architecture analysis
+
+```{r}
+df_hf_models = df_hf_models %>%
+  mutate(architecture = case_when(
+    model_name %in% c("vilt-coco", "bridgetower", "vilt-f30k") ~ "Fusion",
+    model_name %in% c("flava-full") ~ "Both",
+    TRUE ~ "Dual-Encoder"
+  ))
+
+df_summary <- df_hf_models %>%
+  group_by(condition, architecture) %>%
+  summarize(avg_response = mean(response_z, na.rm = TRUE),
+            se_response = sd(response_z, na.rm = TRUE) / sqrt(n()))
+
+ggplot(df_summary, aes(x = architecture, y = avg_response, 
+                       color = condition, group = condition)) +
+  geom_point(size = 3, 
+             position = position_dodge(width = 0.5)) +  
+  geom_errorbar(aes(ymin = avg_response - se_response, 
+                    ymax = avg_response + se_response), 
+                width = 0.2,
+                position = position_dodge(width = 0.5)) + 
+  labs(# title = "",
+       x = "Architecture",
+       y = "Z-scored Response",
+       color = "") +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom") 
+```
+
+## Scale Analysis
+
+```{r}
+df_hf_models = df_hf_models %>%
+  mutate(architecture = case_when(
+    model_name %in% c("vilt-coco", "bridgetower", "vilt-f30k") ~ "Fusion",
+    model_name %in% c("flava-full") ~ "Both",
+    TRUE ~ "Dual-Encoder"
+  ))
+
+
+df_summary <- df_hf_models %>%
+  group_by(architecture, num_params, condition) %>%
+  summarize(
+    avg_response = mean(response_z, na.rm = TRUE),
+    se_response = sd(response_z, na.rm = TRUE) / sqrt(n()),
+    .groups = 'drop'
+  ) %>%
+  pivot_wider(
+    names_from = condition,
+    values_from = c(avg_response, se_response),
+    names_prefix = "condition_"
+  ) %>%
+  mutate(
+    avg_effect = avg_response_condition_Afforded - `avg_response_condition_Non-Afforded`,
+    avg_manipulation_check = avg_response_condition_Related - `avg_response_condition_Non-Afforded`,
+    se_effect = sqrt(se_response_condition_Afforded^2 + `se_response_condition_Non-Afforded`^2),
+    se_manipulation_check = sqrt(se_response_condition_Related^2 + `se_response_condition_Non-Afforded`^2),
+  )
+
+
+ggplot(df_summary, aes(x = num_params, y = avg_effect, 
+                       color = architecture)) +
+  geom_point(size = 6, alpha = .5) +  
+  geom_errorbar(aes(ymin = avg_effect - se_effect, 
+                    ymax = avg_effect + se_effect), 
+                width = 0.2) + 
+  labs(# title = "",
+       x = "Number of Parameters",
+       y = "Effect Size",
+       color = "") +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  scale_y_continuous(limits = c(-1, 1)) +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom") 
+
+ggplot(df_summary, aes(x = num_params, y = avg_manipulation_check, 
+                       color = architecture)) +
+  geom_point(size = 6, alpha = .5) +  
+  geom_errorbar(aes(ymin = avg_manipulation_check - se_manipulation_check, 
+                    ymax = avg_manipulation_check + se_manipulation_check), 
+                width = 0.2) + 
+  labs(# title = "",
+       x = "Number of Parameters",
+       y = "Effect Size",
+       color = "") +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  scale_y_continuous(limits = c(-1, 1)) +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom") 
+```
+
+
+## Role of `version` and `prompt_type`
+
+```{r}
+mod_full = lmer(data = filter(df_hf_models, condition != "Afforded"), 
+                response_z ~ condition * version + condition * prompt_type+ 
+                  (1 | group_id) + (1 | model_name), 
+                    REML = FALSE)
+
+df_summary <- df_hf_models %>%
+  group_by(condition, model_name, prompt_type) %>%
+  summarize(avg_response = mean(response_z, na.rm = TRUE),
+            se_response = sd(response_z, na.rm = TRUE) / sqrt(n()))
+
+ggplot(df_summary, aes(x = model_name, y = avg_response, 
+                       color = condition, group = condition)) +
+  geom_point(size = 3, 
+             position = position_dodge(width = 0.5)) +  
+  geom_errorbar(aes(ymin = avg_response - se_response, 
+                    ymax = avg_response + se_response), 
+                width = 0.2,
+                position = position_dodge(width = 0.5)) + 
+  labs(# title = "",
+       x = "",
+       y = "Z-scored Response",
+       color = "") +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom") +
+  facet_wrap(~prompt_type)
+
+df_summary <- df_hf_models %>%
+  group_by(condition, model_name, version) %>%
+  summarize(avg_response = mean(response_z, na.rm = TRUE),
+            se_response = sd(response_z, na.rm = TRUE) / sqrt(n()))
+
+ggplot(df_summary, aes(x = model_name, y = avg_response, 
+                       color = condition, group = condition)) +
+  geom_point(size = 3, 
+             position = position_dodge(width = 0.5)) +  
+  geom_errorbar(aes(ymin = avg_response - se_response, 
+                    ymax = avg_response + se_response), 
+                width = 0.2,
+                position = position_dodge(width = 0.5)) + 
+  labs(# title = "",
+       x = "",
+       y = "Z-scored Response",
+       color = "") +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom") +
+  facet_wrap(~version)
+
+```
+
