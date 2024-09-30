@@ -61,7 +61,7 @@ table(df_hf_models$model_name)
 directory_path <- "../../data/processed/models/closed_models//"
 csv_files <- list.files(path = directory_path, pattern = "*.csv", full.names = TRUE)
 csv_list <- csv_files %>%
-  map(~ read_csv(.))
+  map(~ read_csv(.) %>% mutate(response = as.double(response)))
 df_closed_models <- bind_rows(csv_list)
 
 df_closed_models = df_closed_models %>%
@@ -337,6 +337,24 @@ Although both GPTs show an effect *on average* between Afforded and Non-Afforded
 
 ```{r}
 df_closed_models %>%
+  filter(model_name %in% c("gpt-4o", "gpt-4-turbo")) %>%
+  ggplot(aes(x = response, fill = condition)) +
+  geom_bar(stat = "count") +
+  theme_minimal() +
+  facet_wrap(~model_name + condition) +
+  scale_fill_viridis_d() +
+  labs(x = "Response") +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "none")
+```
+
+```{r}
+df_closed_models %>%
+  filter(model_name %in% c("gpt-4o_100", "gpt-4-turbo_100")) %>%
   ggplot(aes(x = response, fill = condition)) +
   geom_bar(stat = "count") +
   theme_minimal() +
