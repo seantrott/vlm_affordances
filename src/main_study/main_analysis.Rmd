@@ -696,3 +696,33 @@ ggplot(df_summary, aes(x = model_name, y = avg_response,
 
 ```
 
+# Model table
+
+```{r}
+
+model_names <- unique(df_merged$model_name)
+
+model_df <- data.frame(model_names, open=c(rep("Open Source", 10), rep("Closed Source", 4))) %>%
+  filter(
+    str_count(model_names, "_100") < 1
+  ) %>%
+  rename(
+    "Model Name" = model_names,
+    "Open Source" = open
+  )
+
+model_df$Architecture = c("Dual Encoder", "Fusion (Dual-Stream)",
+                          rep("Dual Encoder", 6),
+                          rep("Fusion (Single Stream", 2),
+                          rep("Unknown", 2))
+
+
+model_df$Reference = c("Jia et al. (2021)", "Xu et al. (2023)", 
+                       rep("\\citep{schuhmann2022laionb}", 3), rep("OpenAI", 2), "Singh et al. 2022", rep("Kim et al. (2021)", 2), "GPT-4o", "GPT-4-turbo")
+
+library(xtable)
+
+xtable(model_df)
+
+```
+
