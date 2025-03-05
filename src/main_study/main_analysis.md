@@ -367,7 +367,7 @@ ggplot(df_summary, aes(x = model_name,
         legend.position = "bottom")
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-5-1.png)<!-- -->
+![](main_analysis_files/figure-html/rq1_confirmatory-1.png)<!-- -->
 
 ```r
 ggplot(df_merged, aes(x = model_name, y = response_z, color = condition)) +
@@ -406,7 +406,7 @@ ggplot(df_merged, aes(x = model_name, y = response_z, color = condition)) +
   )
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-5-2.png)<!-- -->
+![](main_analysis_files/figure-html/rq1_confirmatory-2.png)<!-- -->
 
 
 
@@ -476,7 +476,7 @@ tidy_results %>%
   theme_minimal()
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-6-1.png)<!-- -->
+![](main_analysis_files/figure-html/rq1_coefficients-1.png)<!-- -->
 
 ```r
 # Extract just the results for "conditionNon-Afforded"
@@ -501,7 +501,7 @@ final_df %>%
 ```
 ##             model   original_p adjusted_p_holm  lrt_p_value adjusted_p_lrt_holm
 ## 1       vilt-coco 2.763519e-06    2.763519e-05 2.642306e-06        2.642306e-05
-## 2 gpt-4-turbo_100 3.479290e-08    4.175148e-07 3.273129e-08        3.927754e-07
+## 2 gpt-4-turbo_100 3.479290e-08    4.175147e-07 3.273129e-08        3.927754e-07
 ## 3     gpt-4-turbo 5.719596e-07    6.291556e-06 5.436841e-07        5.980525e-06
 ## 4      gpt-4o_100 1.406419e-13    1.968987e-12 1.264180e-13        1.769853e-12
 ## 5          gpt-4o 3.011499e-08    3.914948e-07 2.831542e-08        3.681004e-07
@@ -578,7 +578,7 @@ tidy_results %>%
   theme_minimal()
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-7-1.png)<!-- -->
+![](main_analysis_files/figure-html/rq2_mc-1.png)<!-- -->
 
 ```r
 # Extract just the results for "conditionNon-Afforded"
@@ -656,8 +656,7 @@ df_closed_models %>%
         legend.position = "none")
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-8-1.png)<!-- -->
-
+![](main_analysis_files/figure-html/rq3_closed_models-1.png)<!-- -->
 
 ```r
 df_closed_models %>%
@@ -676,7 +675,59 @@ df_closed_models %>%
         legend.position = "none")
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-9-1.png)<!-- -->
+![](main_analysis_files/figure-html/rq3_closed_models-2.png)<!-- -->
+
+
+Which items do closed-source models see incorrect answers for, i.e., a `1` for `Related` or `Afforded`?
+
+
+```r
+### Related
+df_related_wrong_4o = df_closed_models %>%
+  filter(model_name %in% c("gpt-4o_100")) %>%
+  filter(condition == "Related") %>%
+  filter(response <= 1) %>%
+  select(text, img_name, prompt_type, version)
+df_related_wrong_4o
+```
+
+```
+## # A tibble: 2 × 4
+##   text                                                   img_n…¹ promp…² version
+##   <chr>                                                  <chr>   <chr>   <chr>  
+## 1 David was playing hide and seek with his son, Duncan.… broomc… explic… synthe…
+## 2 David was playing hide and seek with his son, Duncan.… broomc… implic… synthe…
+## # … with abbreviated variable names ¹​img_name, ²​prompt_type
+```
+
+```r
+### Afforded
+df_afforded_wrong_4o = df_closed_models %>%
+  filter(model_name %in% c("gpt-4o_100")) %>%
+  filter(condition == "Afforded") %>%
+  filter(response <= 1) %>%
+  select(text, img_name, prompt_type, version, response)
+df_afforded_wrong_4o
+```
+
+```
+## # A tibble: 22 × 5
+##    text                                          img_n…¹ promp…² version respo…³
+##    <chr>                                         <chr>   <chr>   <chr>     <dbl>
+##  1 David was playing hide and seek with his son… clothe… explic… natural       1
+##  2 After taking a shower at the gym, Sarah disc… warmth… explic… natural       1
+##  3 Janet was teaching and needed to draw on the… rice_n… explic… natural       1
+##  4 Judy was using the Xerox machine in the hall… thelav… explic… natural       1
+##  5 David was playing hide and seek with his son… clothe… implic… natural       1
+##  6 Janet was teaching and needed to draw on the… rice_n… implic… natural       1
+##  7 Judy was using the Xerox machine in the hall… thelav… implic… natural       1
+##  8 David was playing hide and seek with his son… clothe… explic… synthe…       1
+##  9 Phil was trying to get a barbecue going. He … map_sy… explic… synthe…       1
+## 10 After taking a shower at the gym, Sarah disc… warmth… explic… synthe…       1
+## # … with 12 more rows, and abbreviated variable names ¹​img_name, ²​prompt_type,
+## #   ³​response
+## # ℹ Use `print(n = ...)` to see more rows
+```
 
 
 ## Accuracy
@@ -687,7 +738,7 @@ A slightly different distribution of models is found when you compare the *avera
 ```r
 df_accuracy = df_merged %>%
   select(condition, response_z, group_id, text, 
-         model_name, prompt_type) %>%
+         model_name, prompt_type, num_params) %>%
   #filter(condition != "Related") %>%
   pivot_wider(
     names_from = condition,
@@ -704,8 +755,11 @@ df_accuracy = df_merged %>%
 ## Adding missing grouping variables: `version`
 ```
 
+
+
+
 ```r
-df_accuracy %>%
+df_accuracy%>%
   ggplot(aes(x = group_id, y = diff_main)) +
   geom_bar(stat = "identity") +
   # geom_vline(xintercept = 0, linetype = "dotted") +
@@ -722,7 +776,7 @@ df_accuracy %>%
         legend.position = "none")
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-10-1.png)<!-- -->
+![](main_analysis_files/figure-html/rq4_accuracy-1.png)<!-- -->
 
 ```r
 mean(df_accuracy$accuracy_main)
@@ -776,30 +830,39 @@ sd(df_accuracy$diff_manipulation_check)
 
 ```r
 accuracy_by_model = df_accuracy %>%
-  group_by(model_name) %>%
+  group_by(model_name, num_params) %>%
   summarise(avg_accuracy_main = mean(accuracy_main),
             avg_accuracy_manipulation = mean(accuracy_manipulation_check))
+```
+
+```
+## `summarise()` has grouped output by 'model_name'. You can override using the
+## `.groups` argument.
+```
+
+```r
 accuracy_by_model
 ```
 
 ```
-## # A tibble: 14 × 3
-##    model_name             avg_accuracy_main avg_accuracy_manipulation
-##    <chr>                              <dbl>                     <dbl>
-##  1 align-base                         0.569                     0.681
-##  2 bridgetower                        0.472                     0.722
-##  3 clip-big-giant                     0.417                     0.667
-##  4 clip-giant                         0.556                     0.764
-##  5 clip-huge-14                       0.472                     0.625
-##  6 clip-vit-base-patch32              0.556                     0.694
-##  7 clip-vit-large-patch14             0.542                     0.764
-##  8 flava-full                         0.597                     0.75 
-##  9 gpt-4-turbo                        0.347                     0.792
-## 10 gpt-4-turbo_100                    0.486                     0.889
-## 11 gpt-4o                             0.361                     0.764
-## 12 gpt-4o_100                         0.681                     0.958
-## 13 vilt-coco                          0.528                     0.75 
-## 14 vilt-f30k                          0.486                     0.597
+## # A tibble: 14 × 4
+## # Groups:   model_name [14]
+##    model_name             num_params avg_accuracy_main avg_accuracy_manipulation
+##    <chr>                       <dbl>             <dbl>                     <dbl>
+##  1 align-base              172117841             0.569                     0.681
+##  2 bridgetower             864518146             0.472                     0.722
+##  3 clip-big-giant         2539567105             0.417                     0.667
+##  4 clip-giant             1366678273             0.556                     0.764
+##  5 clip-huge-14            986109441             0.472                     0.625
+##  6 clip-vit-base-patch32   151277313             0.556                     0.694
+##  7 clip-vit-large-patch14  427616513             0.542                     0.764
+##  8 flava-full              241356289             0.597                     0.75 
+##  9 gpt-4-turbo                    NA             0.347                     0.792
+## 10 gpt-4-turbo_100                NA             0.486                     0.889
+## 11 gpt-4o                         NA             0.361                     0.764
+## 12 gpt-4o_100                     NA             0.681                     0.958
+## 13 vilt-coco               111595777             0.528                     0.75 
+## 14 vilt-f30k               111595777             0.486                     0.597
 ```
 
 ```r
@@ -821,7 +884,7 @@ accuracy_by_model %>%
         legend.position = "none")
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-10-2.png)<!-- -->
+![](main_analysis_files/figure-html/rq4_accuracy-2.png)<!-- -->
 
 ```r
 accuracy_by_model %>%
@@ -842,11 +905,69 @@ accuracy_by_model %>%
         legend.position = "none")
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-10-3.png)<!-- -->
+![](main_analysis_files/figure-html/rq4_accuracy-3.png)<!-- -->
+
+```r
+accuracy_by_model %>%
+  ggplot(aes(x = num_params, y = avg_accuracy_main)) +
+  geom_point(size = 6, alpha = .5) +
+  labs(# title = "",
+       x = "Number of Parameters",
+       y = "Accuracy",
+       color = "") +
+  geom_hline(yintercept = .5, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  scale_y_continuous(limits = c(0, 1)) +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom") 
+```
+
+```
+## Warning: Removed 4 rows containing missing values (geom_point).
+```
+
+![](main_analysis_files/figure-html/rq4_accuracy-4.png)<!-- -->
+
+
 
 ### Item-wise effects (main contrast)
 
 We see clear groups of correlations.
+
+
+```r
+### reshape data
+df_wide = df_merged %>%
+  select(group_id, model_name, condition, version, prompt_type, response_z) %>%
+  unnest(version) %>%
+  pivot_wider(names_from = c(model_name),
+              values_from = response_z)
+
+cols = df_wide %>%
+  ungroup() %>%
+  select(-group_id, 
+         -condition, 
+         -version, 
+         -prompt_type)
+cor_matrix <- cor(cols, use = "complete.obs")
+
+
+# Plot the correlation matrix
+ggcorrplot(cor_matrix, 
+           hc.order = TRUE,
+           method = "square" 
+          )
+```
+
+![](main_analysis_files/figure-html/rq5_model_correlations_overall-1.png)<!-- -->
+
+
+### Item-wise effects (main contrast)
 
 
 ```r
@@ -957,7 +1078,8 @@ ggcorrplot(cor_matrix,
           )
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-11-1.png)<!-- -->
+![](main_analysis_files/figure-html/rq5_model_correlations_differences-1.png)<!-- -->
+
 
 ### Item-wise effects (manipulation check contrast)
 
@@ -1072,7 +1194,8 @@ ggcorrplot(cor_matrix,
           )
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
+![](main_analysis_files/figure-html/rq5_model_correlations_mc-1.png)<!-- -->
+
 ## Cross-architecture analysis
 
 
@@ -1120,7 +1243,7 @@ ggplot(df_summary, aes(x = architecture, y = avg_response,
         legend.position = "bottom") 
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-13-1.png)<!-- -->
+![](main_analysis_files/figure-html/rq6_architecture-1.png)<!-- -->
 
 ## Scale Analysis
 
@@ -1176,7 +1299,7 @@ ggplot(df_summary, aes(x = num_params, y = avg_effect,
         legend.position = "bottom") 
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-14-1.png)<!-- -->
+![](main_analysis_files/figure-html/rq7_scale-1.png)<!-- -->
 
 ```r
 ggplot(df_summary, aes(x = num_params, y = avg_manipulation_check, 
@@ -1201,7 +1324,7 @@ ggplot(df_summary, aes(x = num_params, y = avg_manipulation_check,
         legend.position = "bottom") 
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-14-2.png)<!-- -->
+![](main_analysis_files/figure-html/rq7_scale-2.png)<!-- -->
 
 
 ## Role of `version` and `prompt_type`
@@ -1256,7 +1379,7 @@ ggplot(df_summary, aes(x = model_name, y = avg_response,
   facet_wrap(~prompt_type)
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-15-1.png)<!-- -->
+![](main_analysis_files/figure-html/rq8_version-1.png)<!-- -->
 
 ```r
 df_summary <- df_hf_models %>%
@@ -1296,5 +1419,5 @@ ggplot(df_summary, aes(x = model_name, y = avg_response,
   facet_wrap(~version)
 ```
 
-![](main_analysis_files/figure-html/unnamed-chunk-15-2.png)<!-- -->
+![](main_analysis_files/figure-html/rq8_version-2.png)<!-- -->
 

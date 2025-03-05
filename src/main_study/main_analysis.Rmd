@@ -91,7 +91,7 @@ df_hf_models = df_hf_models %>%
 
 # Confirmatory Analyses
 
-```{r}
+```{r rq1_confirmatory}
 
 ### Average z-scored response
 df_summary <- df_merged %>%
@@ -166,7 +166,7 @@ ggplot(df_merged, aes(x = model_name, y = response_z, color = condition)) +
 ## Afforded (non-canonical) vs. Non-Afforded 
 
 
-```{r}
+```{r rq1_coefficients}
 # Define a function to fit the full and reduced lmer models and return the tidy summaries and LRT p-values
 fit_and_tidy_lmer_model_with_lrt <- function(df) {
   # Fit the full mixed model
@@ -249,7 +249,7 @@ final_df %>%
 
 ## Related (canonical) vs. Non-Afforded 
 
-```{r}
+```{r rq2_mc}
 fit_and_tidy_lmer_model_with_lrt <- function(df) {
   # Fit the full mixed model
   full_model_fit <- lmer(response_z ~ condition + prompt_type + version + (1 | group_id), 
@@ -335,7 +335,7 @@ final_df %>%
 
 Although both GPTs show an effect *on average* between Afforded and Non-Afforded, they do assign a rating of "1" to many Afforded items.
 
-```{r}
+```{r rq3_closed_models}
 df_closed_models %>%
   filter(model_name %in% c("gpt-4o", "gpt-4-turbo")) %>%
   ggplot(aes(x = response, fill = condition)) +
@@ -350,9 +350,7 @@ df_closed_models %>%
         # legend.title = element_text(size = rel(1.5)),
         strip.text.x = element_text(size = rel(1.2)),
         legend.position = "none")
-```
 
-```{r}
 df_closed_models %>%
   filter(model_name %in% c("gpt-4o_100", "gpt-4-turbo_100")) %>%
   ggplot(aes(x = response, fill = condition)) +
@@ -370,15 +368,42 @@ df_closed_models %>%
 ```
 
 
+Which items do closed-source models see incorrect answers for, i.e., a `1` for `Related` or `Afforded`?
+
+```{r}
+### Related
+df_related_wrong_4o = df_closed_models %>%
+  filter(model_name %in% c("gpt-4o_100")) %>%
+  filter(condition == "Related") %>%
+  filter(response <= 1) %>%
+  select(text, img_name, prompt_type, version)
+df_related_wrong_4o
+
+### Afforded
+df_afforded_wrong_4o = df_closed_models %>%
+  filter(model_name %in% c("gpt-4o_100")) %>%
+  filter(condition == "Afforded") %>%
+  filter(response <= 1) %>%
+  select(text, img_name, prompt_type, version, response)
+df_afforded_wrong_4o
+
+
+df_closed_models %>%
+  filter(model_name %in% c("gpt-4o", "gpt-4-turbo")) %>%
+  mutate(nonsense = response == 1) %>%
+  group_by(model_name, condition) %>%
+  summarise(mean_nonsense = mean(nonsense))
+```
+
+
 ## Accuracy
 
 A slightly different distribution of models is found when you compare the *average difference* between Afforded vs. Non-Afforded as opposed to the *proportion of items in which Afforded > Non-Afforded* (how "accuracy" is operationalized here).
 
 ```{r}
-
 df_accuracy = df_merged %>%
   select(condition, response_z, group_id, text, 
-         model_name, prompt_type) %>%
+         model_name, prompt_type, num_params) %>%
   #filter(condition != "Related") %>%
   pivot_wider(
     names_from = condition,
@@ -389,9 +414,12 @@ df_accuracy = df_merged %>%
          diff_manipulation_check = condition_Related -`condition_Non-Afforded`) %>%
   mutate(accuracy_main = diff_main > 0,
          accuracy_manipulation_check = diff_manipulation_check > 0)
-  
+```
 
-df_accuracy %>%
+
+
+```{r rq4_accuracy}
+df_accuracy%>%
   ggplot(aes(x = group_id, y = diff_main)) +
   geom_bar(stat = "identity") +
   # geom_vline(xintercept = 0, linetype = "dotted") +
@@ -419,7 +447,7 @@ sd(df_accuracy$diff_manipulation_check)
   
 
 accuracy_by_model = df_accuracy %>%
-  group_by(model_name) %>%
+  group_by(model_name, num_params) %>%
   summarise(avg_accuracy_main = mean(accuracy_main),
             avg_accuracy_manipulation = mean(accuracy_manipulation_check))
 accuracy_by_model
@@ -459,13 +487,63 @@ accuracy_by_model %>%
         strip.text.x = element_text(size = rel(1.2)),
         legend.position = "none")
 
+
+accuracy_by_model %>%
+  ggplot(aes(x = num_params, y = avg_accuracy_main)) +
+  geom_point(size = 6, alpha = .5) +
+  labs(# title = "",
+       x = "Number of Parameters",
+       y = "Accuracy",
+       color = "") +
+  geom_hline(yintercept = .5, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  scale_y_continuous(limits = c(0, 1)) +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom") 
+
 ```
 
-### Item-wise effects (main contrast)
+
+
+### Cross-model correlations
 
 We see clear groups of correlations.
 
-```{r}
+```{r rq5_model_correlations_overall}
+### reshape data
+df_wide = df_merged %>%
+  select(group_id, model_name, condition, version, prompt_type, response_z) %>%
+  unnest(version) %>%
+  pivot_wider(names_from = c(model_name),
+              values_from = response_z)
+
+cols = df_wide %>%
+  ungroup() %>%
+  select(-group_id, 
+         -condition, 
+         -version, 
+         -prompt_type)
+cor_matrix <- cor(cols, use = "complete.obs")
+
+
+# Plot the correlation matrix
+ggcorrplot(cor_matrix, 
+           hc.order = TRUE,
+           method = "square" 
+          )
+
+
+```
+
+
+### Item-wise effects (main contrast)
+
+```{r rq5_model_correlations_differences}
 ### reshape data
 df_wide <- df_accuracy %>%
   group_by(model_name, group_id) %>%
@@ -488,11 +566,12 @@ ggcorrplot(cor_matrix,
 
 ```
 
+
 ### Item-wise effects (manipulation check contrast)
 
 We see clear groups of correlations.
 
-```{r}
+```{r rq5_model_correlations_mc}
 ### reshape data
 df_wide <- df_accuracy %>%
   group_by(model_name, group_id) %>%
@@ -514,13 +593,13 @@ ggcorrplot(cor_matrix,
 
 
 ```
+
 ## Cross-architecture analysis
 
-```{r}
+```{r rq6_architecture}
 df_hf_models = df_hf_models %>%
   mutate(architecture = case_when(
     model_name %in% c("vilt-coco", "bridgetower", "vilt-f30k") ~ "Fusion",
-    model_name %in% c("flava-full") ~ "Both",
     TRUE ~ "Dual-Encoder"
   ))
 
@@ -551,15 +630,22 @@ ggplot(df_summary, aes(x = architecture, y = avg_response,
         # legend.title = element_text(size = rel(1.5)),
         strip.text.x = element_text(size = rel(1.2)),
         legend.position = "bottom") 
+
+
+
+mod_full = lmer(data = filter(df_hf_models, condition != "Related"), 
+                response_z ~ condition * architecture + 
+                  log10(num_params) * condition + 
+                  (1 | group_id) + (1 | model_name), 
+                    REML = FALSE)
 ```
 
 ## Scale Analysis
 
-```{r}
+```{r rq7_scale}
 df_hf_models = df_hf_models %>%
   mutate(architecture = case_when(
     model_name %in% c("vilt-coco", "bridgetower", "vilt-f30k") ~ "Fusion",
-    model_name %in% c("flava-full") ~ "Both",
     TRUE ~ "Dual-Encoder"
   ))
 
@@ -630,8 +716,8 @@ ggplot(df_summary, aes(x = num_params, y = avg_manipulation_check,
 
 ## Role of `version` and `prompt_type`
 
-```{r}
-mod_full = lmer(data = filter(df_hf_models, condition != "Afforded"), 
+```{r rq8_version}
+mod_full = lmer(data = filter(df_merged, condition != "Related"), 
                 response_z ~ condition * version + condition * prompt_type+ 
                   (1 | group_id) + (1 | model_name), 
                     REML = FALSE)

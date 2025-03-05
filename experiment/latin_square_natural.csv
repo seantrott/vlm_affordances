@@ -1,0 +1,55 @@
+list_id	scenario	condition	group_id	image_path
+1	Brad was sitting in his office when an intruder threatened him with a knife. Brad used this to protect himself.	Afforded	1	images/laptopcomputer_natural.jpeg
+2	Brad was sitting in his office when an intruder threatened him with a knife. Brad used this to protect himself.	Non-Afforded	1	images/huntingrifle_natural.jpeg
+3	Brad was sitting in his office when an intruder threatened him with a knife. Brad used this to protect himself.	Related	1	images/huntingrifle_natural.jpeg
+1	Jenny was hiking in the woods. She left her friend Adam a note explaining that she would mark her choice of direction at each intersection. Jenny pointed out her path using this.	Non-Afforded	2	images/string_natural.jpeg
+2	Jenny was hiking in the woods. She left her friend Adam a note explaining that she would mark her choice of direction at each intersection. Jenny pointed out her path using this.	Related	2	images/string_natural.jpeg
+3	Jenny was hiking in the woods. She left her friend Adam a note explaining that she would mark her choice of direction at each intersection. Jenny pointed out her path using this.	Afforded	2	images/pen_natural.jpeg
+1	Art was having a party. He realized he didn't have enough coasters to protect the tables from condensation dripping off the glasses. Art used this to protect his table.	Related	3	images/oldmagazines_natural.jpeg
+2	Art was having a party. He realized he didn't have enough coasters to protect the tables from condensation dripping off the glasses. Art used this to protect his table.	Afforded	3	images/floppydisks_natural.jpeg
+3	Art was having a party. He realized he didn't have enough coasters to protect the tables from condensation dripping off the glasses. Art used this to protect his table.	Non-Afforded	3	images/oldmagazines_natural.jpeg
+1	Mike was freezing in the wind. He needed something to cover his face, but he didn't have enough money to buy a scarf. Mike used this to cover his face.	Afforded	4	images/newspaper_natural.jpeg
+2	Mike was freezing in the wind. He needed something to cover his face, but he didn't have enough money to buy a scarf. Mike used this to cover his face.	Non-Afforded	4	images/skimask_natural.jpeg
+3	Mike was freezing in the wind. He needed something to cover his face, but he didn't have enough money to buy a scarf. Mike used this to cover his face.	Related	4	images/skimask_natural.jpeg
+1	David was playing hide and seek with his son, Duncan. Duncan hid in here.	Non-Afforded	5	images/broomcloset_natural.jpeg
+2	David was playing hide and seek with his son, Duncan. Duncan hid in here.	Related	5	images/broomcloset_natural.jpeg
+3	David was playing hide and seek with his son, Duncan. Duncan hid in here.	Afforded	5	images/clothesdryer_natural.jpeg
+1	Bill was painting his barn. Part of the wall was too high to reach without a ladder, but he'd lent his ladder to a neighbor. Bill stood on this to finish painting.	Related	6	images/chair_natural.jpeg
+2	Bill was painting his barn. Part of the wall was too high to reach without a ladder, but he'd lent his ladder to a neighbor. Bill stood on this to finish painting.	Afforded	6	images/tractor_natural.jpeg
+3	Bill was painting his barn. Part of the wall was too high to reach without a ladder, but he'd lent his ladder to a neighbor. Bill stood on this to finish painting.	Non-Afforded	6	images/chair_natural.jpeg
+1	Phil was trying to get a barbecue going. He tried blowing on the coals, but they still weren't burning well.  Phil used this to fan the fire.	Afforded	7	images/map_natural.jpeg
+2	Phil was trying to get a barbecue going. He tried blowing on the coals, but they still weren't burning well.  Phil used this to fan the fire.	Non-Afforded	7	images/bellows_natural.jpeg
+3	Phil was trying to get a barbecue going. He tried blowing on the coals, but they still weren't burning well.  Phil used this to fan the fire.	Related	7	images/bellows_natural.jpeg
+1	Peggy was babysitting her infant nephew. He was being fussy, but she had few toys to occupy him. Peggy gave him this to play with.	Non-Afforded	8	images/redbeanbag_natural.jpeg
+2	Peggy was babysitting her infant nephew. He was being fussy, but she had few toys to occupy him. Peggy gave him this to play with.	Related	8	images/redbeanbag_natural.jpeg
+3	Peggy was babysitting her infant nephew. He was being fussy, but she had few toys to occupy him. Peggy gave him this to play with.	Afforded	8	images/plasticspoon_natural.jpeg
+1	Joe's roommates had taken all of the space in the closet, and there was no place to hang his coat. Joe used this as a coat rack.	Related	9	images/doorknob_natural.jpeg
+2	Joe's roommates had taken all of the space in the closet, and there was no place to hang his coat. Joe used this as a coat rack.	Afforded	9	images/vacuumcleaner_natural.jpeg
+3	Joe's roommates had taken all of the space in the closet, and there was no place to hang his coat. Joe used this as a coat rack.	Non-Afforded	9	images/doorknob_natural.jpeg
+1	Jonathan opened up his car's trunk, but the ice scraper wasn't there. Jonathan used this to chisel an inch of ice off his windshield.	Afforded	10	images/seveniron_natural.jpeg
+2	Jonathan opened up his car's trunk, but the ice scraper wasn't there. Jonathan used this to chisel an inch of ice off his windshield.	Non-Afforded	10	images/screwdriver_natural.jpeg
+3	Jonathan opened up his car's trunk, but the ice scraper wasn't there. Jonathan used this to chisel an inch of ice off his windshield.	Related	10	images/screwdriver_natural.jpeg
+1	After taking a shower at the gym, Sarah discovered that her skirt needed to be pressed free of wrinkles before she returned to work. Sarah used this to smooth her skirt.	Non-Afforded	11	images/hairdryer_natural.jpeg
+2	After taking a shower at the gym, Sarah discovered that her skirt needed to be pressed free of wrinkles before she returned to work. Sarah used this to smooth her skirt.	Related	11	images/hairdryer_natural.jpeg
+3	After taking a shower at the gym, Sarah discovered that her skirt needed to be pressed free of wrinkles before she returned to work. Sarah used this to smooth her skirt.	Afforded	11	images/warmthermos_natural.jpeg
+1	At work, Aaron realized that he forgot his cap. The rule was that if your hair isn't covered, you cannot work. Aaron used this to cover his hair.	Related	12	images/showercap_natural.jpeg
+2	At work, Aaron realized that he forgot his cap. The rule was that if your hair isn't covered, you cannot work. Aaron used this to cover his hair.	Afforded	12	images/sandwichwrapper_natural.jpeg
+3	At work, Aaron realized that he forgot his cap. The rule was that if your hair isn't covered, you cannot work. Aaron used this to cover his hair.	Non-Afforded	12	images/showercap_natural.jpeg
+1	Marissa forgot to bring her pillow on her camping trip. Marisa used this as a pillow.	Afforded	13	images/leaves_natural.jpeg
+2	Marissa forgot to bring her pillow on her camping trip. Marisa used this as a pillow.	Non-Afforded	13	images/clothes_natural.jpeg
+3	Marissa forgot to bring her pillow on her camping trip. Marisa used this as a pillow.	Related	13	images/clothes_natural.jpeg
+1	After wading barefoot in the lake, Erik needed something to get dry. Erik used this to dry his feet.	Non-Afforded	14	images/towel_natural.jpeg
+2	After wading barefoot in the lake, Erik needed something to get dry. Erik used this to dry his feet.	Related	14	images/towel_natural.jpeg
+3	After wading barefoot in the lake, Erik needed something to get dry. Erik used this to dry his feet.	Afforded	14	images/shirt_natural.jpeg
+1	While taking a walk, Colleen ran into an old friend. They exchanged phone numbers, but Colleen couldn't find anything to write on. Colleen used this to write the phone number on.	Related	15	images/notepad_natural.jpeg
+2	While taking a walk, Colleen ran into an old friend. They exchanged phone numbers, but Colleen couldn't find anything to write on. Colleen used this to write the phone number on.	Afforded	15	images/popsiclestick_natural.jpeg
+3	While taking a walk, Colleen ran into an old friend. They exchanged phone numbers, but Colleen couldn't find anything to write on. Colleen used this to write the phone number on.	Non-Afforded	15	images/notepad_natural.jpeg
+1	Harry accidentally dropped his book behind his bed. He couldn't reach it with his hand. Harry used this to push it out.	Afforded	16	images/rolledpaper_natural.jpeg
+2	Harry accidentally dropped his book behind his bed. He couldn't reach it with his hand. Harry used this to push it out.	Non-Afforded	16	images/mophandle_natural.jpeg
+3	Harry accidentally dropped his book behind his bed. He couldn't reach it with his hand. Harry used this to push it out.	Related	16	images/mophandle_natural.jpeg
+1	Janet was teaching and needed to draw on the blackboard, but there were no fresh supplies in the classroom. Janet used this to draw on the blackboard.	Non-Afforded	17	images/chalk_natural.jpeg
+2	Janet was teaching and needed to draw on the blackboard, but there were no fresh supplies in the classroom. Janet used this to draw on the blackboard.	Related	17	images/chalk_natural.jpeg
+3	Janet was teaching and needed to draw on the blackboard, but there were no fresh supplies in the classroom. Janet used this to draw on the blackboard.	Afforded	17	images/rice_natural.jpeg
+1	Judy was using the Xerox machine in the hallway, but people kept cutting in to make a few copies. Judy moved her Xerox machine here for more privacy.	Related	18	images/heroffice_natural.jpeg
+2	Judy was using the Xerox machine in the hallway, but people kept cutting in to make a few copies. Judy moved her Xerox machine here for more privacy.	Afforded	18	images/thelavatory_natural.jpeg
+3	Judy was using the Xerox machine in the hallway, but people kept cutting in to make a few copies. Judy moved her Xerox machine here for more privacy.	Non-Afforded	18	images/heroffice_natural.jpeg

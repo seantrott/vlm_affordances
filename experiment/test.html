@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>JsPsych 6.0.5 Example</title>
+
+  <!-- Load jsPsych core (version 6.0.5 in its own folder) -->
+  <script src="jspsych-6.0.5/jspsych.js"></script>
+  <script src="jspsych-6.0.5/plugins/jspsych-survey-text.js"></script>
+  <script src="jspsych-6.0.5/plugins/jspsych-html-button-response.js"></script>
+  <script src="jspsych-6.0.5/plugins/jspsych-html-keyboard-response.js"></script>
+  <script src="jspsych-6.0.5/plugins/jspsych-survey-multi-choice.js"></script>
+  <script src="jspsych-6.0.5/plugins/jspsych-instructions.js"></script>
+  <script src="jspsych-6.0.5/plugins/jspsych-external-html.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+  <link rel="stylesheet" href="jspsych-6.0.5/css/jspsych.css"></link>
+
+  <style>
+    body {
+      /* Center text on the page */
+      text-align: center;
+      /* Optionally limit width if you like */
+      max-width: 800px;
+      margin: 0 auto;
+      font-family: sans-serif;
+    }
+    img {
+      /* Make images appear in the center block */
+      max-width: 500px;
+      display: block;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+<script>
+// Helper function: parse CSV text into an array of objects
+function parseCSVtoJSON(csvText) {
+  const lines = csvText.trim().split('\n');
+  const headers = lines[0].split(',');
+  let results = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    let rowData = {};
+    let row = lines[i].split(',');
+    for (let j = 0; j < headers.length; j++) {
+      rowData[headers[j].trim()] = row[j].trim();
+    }
+    results.push(rowData);
+  }
+  return results;
+}
+
+function parseTSVtoJSON(tsvText) {
+  // Split into lines
+  const lines = tsvText.trim().split('\n');
+
+  console.log(tsvText)
+  // Split the first line by tab to get headers
+  const headers = lines[0].split('\t');
+
+  const results = [];
+  for (let i = 1; i < lines.length; i++) {
+    const row = lines[i].split('\t');
+    let rowData = {};
+    for (let j = 0; j < headers.length; j++) {
+      // if row[j] is undefined (the file is malformed?), handle accordingly
+      rowData[headers[j].trim()] = (row[j] || '').trim();
+    }
+    results.push(rowData);
+  }
+  return results;
+}
+
+// Load the CSV file from same directory
+fetch('latin_square_natural.csv')
+  .then(response => response.text())
+  .then(csvText => {
+    const allRows = parseTSVtoJSON(csvText);  // your custom CSV parse function
+
+
+
+    // Suppose you choose group 2 for this participant
+    const participantGroup = 2;
+
+    // Filter to get only rows for group_id == 2
+    const scenarioData = allRows.filter(r => Number(r.list_id) === participantGroup);
+
+    console.log(scenarioData)
+
+    // Build your trials from that subset
+    const timeline = scenarioData.map(s => ({
+
+
+      type: 'html-button-response',
+      stimulus: `<img src="${s.image_path}" alt="">`,
+      prompt: `<p>${s.scenario}`,
+      choices: ["1", "2", "3", "4", "5"],
+      data: { scenario: s.scenario, condition: s.condition, image_path: s.image_path }
+    }));
+
+
+    // Initialize and run jsPsych
+    jsPsych.init({
+      timeline: timeline,
+      show_progress_bar: true,
+      on_finish: function() {
+        // For demonstration, just display data in the browser
+        jsPsych.data.displayData();
+      }
+    });
+  })
+  .catch(error => {
+    console.error("Error loading CSV file:", error);
+  });
+</script>
+</body>
+</html>

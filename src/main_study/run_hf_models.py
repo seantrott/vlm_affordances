@@ -90,7 +90,6 @@ class HFModelRunner(object):
     def compare_inputs(self, text, image):
 
         if self.model_name in ['clip-vit-base-patch32', 'clip-vit-large-patch14', 
-                              'blip-image-captioning-base', 'blip-image-captioning-large',
                               'align-base', 'clip-huge-14', 'clip-giant', 'clip-big-giant']:
 
             ## Encode text
