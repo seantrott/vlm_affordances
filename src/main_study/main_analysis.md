@@ -323,8 +323,36 @@ df_hf_models = df_hf_models %>%
 ```
 
 
+## Load human data
 
-# Confirmatory Analyses
+
+```r
+df_humans = read_csv("../../data/processed/human_data_cleaned.csv")
+```
+
+```
+## Rows: 1062 Columns: 21
+## ── Column specification ────────────────────────────────────────────────────────
+## Delimiter: ","
+## chr  (12): image_condition, trial_type, scenario, condition, image_path, age...
+## dbl   (6): session_id, list_id, trial_index, response, rt, group_id
+## lgl   (2): participant_id, completed
+## dttm  (1): start_time
+## 
+## ℹ Use `spec()` to retrieve the full column specification for this data.
+## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+```
+
+```r
+nrow(df_humans)
+```
+
+```
+## [1] 1062
+```
+
+
+# Confirmatory Analyses of VLMs
 
 
 ```r
@@ -729,6 +757,314 @@ df_afforded_wrong_4o
 ## # ℹ Use `print(n = ...)` to see more rows
 ```
 
+```r
+df_closed_models %>%
+  filter(model_name %in% c("gpt-4o", "gpt-4-turbo")) %>%
+  mutate(nonsense = response == 1) %>%
+  group_by(model_name, condition) %>%
+  summarise(mean_nonsense = mean(nonsense))
+```
+
+```
+## `summarise()` has grouped output by 'model_name'. You can override using the
+## `.groups` argument.
+```
+
+```
+## # A tibble: 6 × 3
+## # Groups:   model_name [2]
+##   model_name  condition    mean_nonsense
+##   <chr>       <chr>                <dbl>
+## 1 gpt-4-turbo Afforded             0.653
+## 2 gpt-4-turbo Non-Afforded         1    
+## 3 gpt-4-turbo Related              0.208
+## 4 gpt-4o      Afforded             0.639
+## 5 gpt-4o      Non-Afforded         1    
+## 6 gpt-4o      Related              0.236
+```
+
+## Human analysis
+
+
+```r
+### Raw stats
+df_humans %>%
+  group_by(condition) %>%
+  summarize(avg_response = mean(response, na.rm = TRUE),
+            se_response = sd(response, na.rm = TRUE) / sqrt(n()),
+            sd_response = sd(response))
+```
+
+```
+## # A tibble: 3 × 4
+##   condition    avg_response se_response sd_response
+##   <chr>               <dbl>       <dbl>       <dbl>
+## 1 Afforded            1.42       0.0734       1.38 
+## 2 Non-Afforded        0.452      0.0504       0.949
+## 3 Related             2.45       0.0759       1.43
+```
+
+```r
+### Visualization
+df_summary <- df_humans %>%
+  group_by(session_id) %>%
+  mutate(response_z = scale(response)) %>%
+  group_by(condition) %>%
+  summarize(avg_response = mean(response_z, na.rm = TRUE),
+            se_response = sd(response_z, na.rm = TRUE) / sqrt(n()))
+
+### Plot avg z-scored response by condition
+ggplot(df_summary, aes(x = condition,
+                       y = avg_response, 
+                       color = condition, group = condition)) +
+  geom_point(size = 3, 
+             position = position_dodge(width = 0.5)) +  
+  geom_errorbar(aes(ymin = avg_response - se_response, 
+                    ymax = avg_response + se_response), 
+                width = 0.2,
+                position = position_dodge(width = 0.5)) + 
+  labs(# title = "",
+       x = "",
+       y = "Z-scored Response",
+       color = "") +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom")
+```
+
+![](main_analysis_files/figure-html/human_analysis-1.png)<!-- -->
+
+```r
+### By-item visualization
+df_summary <- df_humans %>%
+  group_by(session_id) %>%
+  mutate(response_z = scale(response)) %>%
+  group_by(condition, group_id) %>%
+  summarize(avg_response = mean(response_z, na.rm = TRUE),
+            se_response = sd(response_z, na.rm = TRUE) / sqrt(n()))
+```
+
+```
+## `summarise()` has grouped output by 'condition'. You can override using the
+## `.groups` argument.
+```
+
+```r
+### Plot avg z-scored response by condition
+ggplot(df_summary, aes(x = factor(group_id),
+                       y = avg_response, 
+                       color = condition, group = condition)) +
+  geom_point(size = 3, 
+             position = position_dodge(width = 0.5)) +  
+  geom_errorbar(aes(ymin = avg_response - se_response, 
+                    ymax = avg_response + se_response), 
+                width = 0.2,
+                position = position_dodge(width = 0.5)) + 
+  labs(# title = "",
+       x = "Item",
+       y = "Z-scored Response",
+       color = "") +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom")
+```
+
+![](main_analysis_files/figure-html/human_analysis-2.png)<!-- -->
+
+```r
+### Then, do LRTs
+##### Aff vs. non-aff
+df_humans_aff = df_humans %>%
+  filter(condition != "Related") 
+
+m_full = lmer(data = df_humans_aff,
+              response ~ condition + image_condition + (1 + condition | session_id) +
+                (1 + condition | group_id))
+
+m_reduced = lmer(data = df_humans_aff,
+              response ~ image_condition + (1 + condition | session_id) +
+                (1 + condition | group_id))
+
+summary(m_full)
+```
+
+```
+## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+## lmerModLmerTest]
+## Formula: 
+## response ~ condition + image_condition + (1 + condition | session_id) +  
+##     (1 + condition | group_id)
+##    Data: df_humans_aff
+## 
+## REML criterion at convergence: 2085
+## 
+## Scaled residuals: 
+##     Min      1Q  Median      3Q     Max 
+## -2.5181 -0.5025 -0.1540  0.4216  3.7633 
+## 
+## Random effects:
+##  Groups     Name                  Variance Std.Dev. Corr 
+##  session_id (Intercept)           0.3272   0.5720        
+##             conditionNon-Afforded 0.3402   0.5833   -0.56
+##  group_id   (Intercept)           0.4943   0.7031        
+##             conditionNon-Afforded 0.4344   0.6591   -0.92
+##  Residual                         0.8493   0.9216        
+## Number of obs: 708, groups:  session_id, 59; group_id, 18
+## 
+## Fixed effects:
+##                          Estimate Std. Error       df t value Pr(>|t|)    
+## (Intercept)               1.43520    0.20106 29.05980   7.138 7.34e-08 ***
+## conditionNon-Afforded    -0.97023    0.18673 22.52535  -5.196 3.06e-05 ***
+## image_conditionsynthetic -0.01975    0.14154 56.19567  -0.140     0.89    
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Correlation of Fixed Effects:
+##             (Intr) cndN-A
+## cndtnNn-Aff -0.785       
+## img_cndtnsy -0.348  0.001
+```
+
+```r
+anova(m_full, m_reduced)
+```
+
+```
+## refitting model(s) with ML (instead of REML)
+```
+
+```
+## Data: df_humans_aff
+## Models:
+## m_reduced: response ~ image_condition + (1 + condition | session_id) + (1 + condition | group_id)
+## m_full: response ~ condition + image_condition + (1 + condition | session_id) + (1 + condition | group_id)
+##           npar    AIC    BIC  logLik deviance  Chisq Df Pr(>Chisq)    
+## m_reduced    9 2114.8 2155.8 -1048.4   2096.8                         
+## m_full      10 2098.7 2144.3 -1039.3   2078.7 18.114  1  2.081e-05 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+```
+
+```r
+##### Rel vs. non-aff
+df_humans_rel = df_humans %>%
+  filter(condition != "Afforded") 
+
+m_full = lmer(data = df_humans_rel,
+              response ~ condition + image_condition + (1 + condition | session_id) +
+                (1 + condition | group_id))
+
+m_reduced = lmer(data = df_humans_rel,
+              response ~ image_condition + (1 + condition | session_id) +
+                (1 + condition | group_id))
+
+summary(m_full)
+```
+
+```
+## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+## lmerModLmerTest]
+## Formula: 
+## response ~ condition + image_condition + (1 + condition | session_id) +  
+##     (1 + condition | group_id)
+##    Data: df_humans_rel
+## 
+## REML criterion at convergence: 2103.3
+## 
+## Scaled residuals: 
+##     Min      1Q  Median      3Q     Max 
+## -2.6654 -0.4293 -0.0739  0.5087  3.5173 
+## 
+## Random effects:
+##  Groups     Name             Variance Std.Dev. Corr 
+##  session_id (Intercept)      0.26647  0.5162        
+##             conditionRelated 0.43985  0.6632   -0.77
+##  group_id   (Intercept)      0.07426  0.2725        
+##             conditionRelated 0.82299  0.9072   -0.43
+##  Residual                    0.89403  0.9455        
+## Number of obs: 708, groups:  session_id, 59; group_id, 18
+## 
+## Fixed effects:
+##                          Estimate Std. Error      df t value Pr(>|t|)    
+## (Intercept)                0.3884     0.1194 47.5669   3.252  0.00211 ** 
+## conditionRelated           2.0007     0.2417 21.8975   8.279 3.45e-08 ***
+## image_conditionsynthetic   0.1351     0.1118 56.0864   1.208  0.23193    
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Correlation of Fixed Effects:
+##             (Intr) cndtnR
+## conditnRltd -0.451       
+## img_cndtnsy -0.461 -0.001
+```
+
+```r
+anova(m_full, m_reduced)
+```
+
+```
+## refitting model(s) with ML (instead of REML)
+```
+
+```
+## Data: df_humans_rel
+## Models:
+## m_reduced: response ~ image_condition + (1 + condition | session_id) + (1 + condition | group_id)
+## m_full: response ~ condition + image_condition + (1 + condition | session_id) + (1 + condition | group_id)
+##           npar    AIC    BIC  logLik deviance  Chisq Df Pr(>Chisq)    
+## m_reduced    9 2145.3 2186.4 -1063.7   2127.3                         
+## m_full      10 2116.8 2162.4 -1048.4   2096.8 30.576  1   3.21e-08 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+```
+
+```r
+### Human accuracy
+df_human_items = df_humans %>%
+  group_by(group_id, condition) %>%
+  summarise(m_response = mean(response)) %>%
+  pivot_wider(names_from = condition, values_from = m_response) %>%
+  mutate(Aff_diff = Afforded - `Non-Afforded`,
+         Rel_diff = Related - `Non-Afforded`) %>%
+  mutate(Aff_correct = Aff_diff > 0,
+         Rel_correct = Rel_diff > 0)
+```
+
+```
+## `summarise()` has grouped output by 'group_id'. You can override using the
+## `.groups` argument.
+```
+
+```r
+mean(df_human_items$Aff_correct)
+```
+
+```
+## [1] 0.9444444
+```
+
+```r
+mean(df_human_items$Rel_correct)
+```
+
+```
+## [1] 1
+```
+
 
 ## Accuracy
 
@@ -875,6 +1211,8 @@ accuracy_by_model %>%
        y = "Accuracy (Afforded vs. Non-Afforded)") +
   coord_flip() +
   theme_minimal() +
+  geom_hline(yintercept = mean(df_human_items$Aff_correct), 
+             color = "black", size = 1.2, linetype = 'dotted') +
   scale_y_continuous(limits = c(0, 1)) +
   theme(axis.title = element_text(size=rel(1.2)),
         axis.text = element_text(size = rel(1.2)),
@@ -894,6 +1232,8 @@ accuracy_by_model %>%
   scale_fill_viridis_d() +
   labs(x = "Model",
        y = "Accuracy (Canonical vs. Non-Afforded)") +
+  geom_hline(yintercept = mean(df_human_items$Rel_correct), 
+             color = "black", size = 1.2, linetype = 'dotted') +
   coord_flip() +
   theme_minimal() +
   scale_y_continuous(limits = c(0, 1)) +
@@ -915,6 +1255,8 @@ accuracy_by_model %>%
        x = "Number of Parameters",
        y = "Accuracy",
        color = "") +
+  geom_hline(yintercept = mean(df_human_items$Aff_correct), 
+             linetype = "dotted", size = 1.2) +
   geom_hline(yintercept = .5, linetype = "dotted") +
   theme_minimal() +
   scale_color_viridis_d() +
@@ -935,15 +1277,32 @@ accuracy_by_model %>%
 
 
 
-### Item-wise effects (main contrast)
+### Cross-model correlations
 
 We see clear groups of correlations.
 
 
 ```r
 ### reshape data
+df_human_agg = df_humans %>%
+  mutate(version = image_condition) %>%
+  group_by(session_id) %>%
+  mutate(response_z = scale(response)) %>%
+  group_by(condition, group_id, version) %>%
+  summarise(response_z = mean(response_z)) %>%
+  mutate(model_name = "Human") %>%
+  mutate(prompt_type = "implicit")
+```
+
+```
+## `summarise()` has grouped output by 'condition', 'group_id'. You can override
+## using the `.groups` argument.
+```
+
+```r
 df_wide = df_merged %>%
   select(group_id, model_name, condition, version, prompt_type, response_z) %>%
+  bind_rows(df_human_agg) %>%
   unnest(version) %>%
   pivot_wider(names_from = c(model_name),
               values_from = response_z)
@@ -1203,7 +1562,6 @@ ggcorrplot(cor_matrix,
 df_hf_models = df_hf_models %>%
   mutate(architecture = case_when(
     model_name %in% c("vilt-coco", "bridgetower", "vilt-f30k") ~ "Fusion",
-    model_name %in% c("flava-full") ~ "Both",
     TRUE ~ "Dual-Encoder"
   ))
 
@@ -1245,6 +1603,18 @@ ggplot(df_summary, aes(x = architecture, y = avg_response,
 
 ![](main_analysis_files/figure-html/rq6_architecture-1.png)<!-- -->
 
+```r
+mod_full = lmer(data = filter(df_hf_models, condition != "Related"), 
+                response_z ~ condition * architecture + 
+                  log10(num_params) * condition + 
+                  (1 | group_id) + (1 | model_name), 
+                    REML = FALSE)
+```
+
+```
+## boundary (singular) fit: see help('isSingular')
+```
+
 ## Scale Analysis
 
 
@@ -1252,7 +1622,6 @@ ggplot(df_summary, aes(x = architecture, y = avg_response,
 df_hf_models = df_hf_models %>%
   mutate(architecture = case_when(
     model_name %in% c("vilt-coco", "bridgetower", "vilt-f30k") ~ "Fusion",
-    model_name %in% c("flava-full") ~ "Both",
     TRUE ~ "Dual-Encoder"
   ))
 
@@ -1331,17 +1700,11 @@ ggplot(df_summary, aes(x = num_params, y = avg_manipulation_check,
 
 
 ```r
-mod_full = lmer(data = filter(df_hf_models, condition != "Afforded"), 
+mod_full = lmer(data = filter(df_merged, condition != "Related"), 
                 response_z ~ condition * version + condition * prompt_type+ 
                   (1 | group_id) + (1 | model_name), 
                     REML = FALSE)
-```
 
-```
-## boundary (singular) fit: see help('isSingular')
-```
-
-```r
 df_summary <- df_hf_models %>%
   group_by(condition, model_name, prompt_type) %>%
   summarize(avg_response = mean(response_z, na.rm = TRUE),
@@ -1420,4 +1783,59 @@ ggplot(df_summary, aes(x = model_name, y = avg_response,
 ```
 
 ![](main_analysis_files/figure-html/rq8_version-2.png)<!-- -->
+
+# Model table
+
+
+```r
+model_names <- unique(df_merged$model_name)
+
+model_df <- data.frame(model_names, open=c(rep("Open Source", 10), rep("Closed Source", 4))) %>%
+  filter(
+    str_count(model_names, "_100") < 1
+  ) %>%
+  rename(
+    "Model Name" = model_names,
+    "Open Source" = open
+  )
+
+model_df$Architecture = c("Dual Encoder", "Fusion (Dual-Stream)",
+                          rep("Dual Encoder", 6),
+                          rep("Fusion (Single Stream", 2),
+                          rep("Unknown", 2))
+
+
+model_df$Reference = c("Jia et al. (2021)", "Xu et al. (2023)", 
+                       rep("\\citep{schuhmann2022laionb}", 3), rep("OpenAI", 2), "Singh et al. 2022", rep("Kim et al. (2021)", 2), "GPT-4o", "GPT-4-turbo")
+
+library(xtable)
+
+xtable(model_df)
+```
+
+```
+## % latex table generated in R 4.2.1 by xtable 1.8-4 package
+## % Sat Mar 22 14:05:08 2025
+## \begin{table}[ht]
+## \centering
+## \begin{tabular}{rllll}
+##   \hline
+##  & Model Name & Open Source & Architecture & Reference \\ 
+##   \hline
+## 1 & align-base & Open Source & Dual Encoder & Jia et al. (2021) \\ 
+##   2 & bridgetower & Open Source & Fusion (Dual-Stream) & Xu et al. (2023) \\ 
+##   3 & clip-big-giant & Open Source & Dual Encoder & $\backslash$citep\{schuhmann2022laionb\} \\ 
+##   4 & clip-giant & Open Source & Dual Encoder & $\backslash$citep\{schuhmann2022laionb\} \\ 
+##   5 & clip-huge-14 & Open Source & Dual Encoder & $\backslash$citep\{schuhmann2022laionb\} \\ 
+##   6 & clip-vit-base-patch32 & Open Source & Dual Encoder & OpenAI \\ 
+##   7 & clip-vit-large-patch14 & Open Source & Dual Encoder & OpenAI \\ 
+##   8 & flava-full & Open Source & Dual Encoder & Singh et al. 2022 \\ 
+##   9 & vilt-coco & Open Source & Fusion (Single Stream & Kim et al. (2021) \\ 
+##   10 & vilt-f30k & Open Source & Fusion (Single Stream & Kim et al. (2021) \\ 
+##   11 & gpt-4-turbo & Closed Source & Unknown & GPT-4o \\ 
+##   12 & gpt-4o & Closed Source & Unknown & GPT-4-turbo \\ 
+##    \hline
+## \end{tabular}
+## \end{table}
+```
 

@@ -2,14 +2,14 @@
 title: "Multimodal Models and Affordances"
 date: "September 12, 2024"
 output:
-  # pdf_document: 
-  #    fig_caption: yes
-  #    keep_md: yes
-  #    keep_tex: yes
-  html_document:
-     keep_md: yes
-     toc: yes
-     toc_float: yes
+  pdf_document: 
+      fig_caption: yes
+      keep_md: yes
+      keep_tex: yes
+  # html_document:
+     #keep_md: yes
+     #toc: yes
+     #toc_float: yes
 
 ---
 
@@ -88,8 +88,15 @@ df_hf_models = df_hf_models %>%
 ```
 
 
+## Load human data
 
-# Confirmatory Analyses
+```{r}
+df_humans = read_csv("../../data/processed/human_data_cleaned.csv")
+nrow(df_humans)
+```
+
+
+# Confirmatory Analyses of VLMs
 
 ```{r rq1_confirmatory}
 
@@ -395,6 +402,128 @@ df_closed_models %>%
   summarise(mean_nonsense = mean(nonsense))
 ```
 
+## Human analysis
+
+```{r human_analysis}
+### Raw stats
+df_humans %>%
+  group_by(condition) %>%
+  summarize(avg_response = mean(response, na.rm = TRUE),
+            se_response = sd(response, na.rm = TRUE) / sqrt(n()),
+            sd_response = sd(response))
+
+### Visualization
+df_summary <- df_humans %>%
+  group_by(session_id) %>%
+  mutate(response_z = scale(response)) %>%
+  group_by(condition) %>%
+  summarize(avg_response = mean(response_z, na.rm = TRUE),
+            se_response = sd(response_z, na.rm = TRUE) / sqrt(n()))
+
+### Plot avg z-scored response by condition
+ggplot(df_summary, aes(x = condition,
+                       y = avg_response, 
+                       color = condition, group = condition)) +
+  geom_point(size = 3, 
+             position = position_dodge(width = 0.5)) +  
+  geom_errorbar(aes(ymin = avg_response - se_response, 
+                    ymax = avg_response + se_response), 
+                width = 0.2,
+                position = position_dodge(width = 0.5)) + 
+  labs(# title = "",
+       x = "",
+       y = "Z-scored Response",
+       color = "") +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom")
+
+### By-item visualization
+df_summary <- df_humans %>%
+  group_by(session_id) %>%
+  mutate(response_z = scale(response)) %>%
+  group_by(condition, group_id) %>%
+  summarize(avg_response = mean(response_z, na.rm = TRUE),
+            se_response = sd(response_z, na.rm = TRUE) / sqrt(n()))
+
+### Plot avg z-scored response by condition
+ggplot(df_summary, aes(x = factor(group_id),
+                       y = avg_response, 
+                       color = condition, group = condition)) +
+  geom_point(size = 3, 
+             position = position_dodge(width = 0.5)) +  
+  geom_errorbar(aes(ymin = avg_response - se_response, 
+                    ymax = avg_response + se_response), 
+                width = 0.2,
+                position = position_dodge(width = 0.5)) + 
+  labs(# title = "",
+       x = "Item",
+       y = "Z-scored Response",
+       color = "") +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_minimal() +
+  scale_color_viridis_d() +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom")
+
+### Then, do LRTs
+##### Aff vs. non-aff
+df_humans_aff = df_humans %>%
+  filter(condition != "Related") 
+
+m_full = lmer(data = df_humans_aff,
+              response ~ condition + image_condition + (1 + condition | session_id) +
+                (1 + condition | group_id))
+
+m_reduced = lmer(data = df_humans_aff,
+              response ~ image_condition + (1 + condition | session_id) +
+                (1 + condition | group_id))
+
+summary(m_full)
+anova(m_full, m_reduced)
+
+##### Rel vs. non-aff
+df_humans_rel = df_humans %>%
+  filter(condition != "Afforded") 
+
+m_full = lmer(data = df_humans_rel,
+              response ~ condition + image_condition + (1 + condition | session_id) +
+                (1 + condition | group_id))
+
+m_reduced = lmer(data = df_humans_rel,
+              response ~ image_condition + (1 + condition | session_id) +
+                (1 + condition | group_id))
+
+summary(m_full)
+anova(m_full, m_reduced)
+
+
+### Human accuracy
+df_human_items = df_humans %>%
+  group_by(group_id, condition) %>%
+  summarise(m_response = mean(response)) %>%
+  pivot_wider(names_from = condition, values_from = m_response) %>%
+  mutate(Aff_diff = Afforded - `Non-Afforded`,
+         Rel_diff = Related - `Non-Afforded`) %>%
+  mutate(Aff_correct = Aff_diff > 0,
+         Rel_correct = Rel_diff > 0)
+
+mean(df_human_items$Aff_correct)
+mean(df_human_items$Rel_correct)
+```
+
 
 ## Accuracy
 
@@ -462,6 +591,8 @@ accuracy_by_model %>%
        y = "Accuracy (Afforded vs. Non-Afforded)") +
   coord_flip() +
   theme_minimal() +
+  geom_hline(yintercept = mean(df_human_items$Aff_correct), 
+             color = "black", size = 1.2, linetype = 'dotted') +
   scale_y_continuous(limits = c(0, 1)) +
   theme(axis.title = element_text(size=rel(1.2)),
         axis.text = element_text(size = rel(1.2)),
@@ -477,6 +608,8 @@ accuracy_by_model %>%
   scale_fill_viridis_d() +
   labs(x = "Model",
        y = "Accuracy (Canonical vs. Non-Afforded)") +
+  geom_hline(yintercept = mean(df_human_items$Rel_correct), 
+             color = "black", size = 1.2, linetype = 'dotted') +
   coord_flip() +
   theme_minimal() +
   scale_y_continuous(limits = c(0, 1)) +
@@ -495,6 +628,8 @@ accuracy_by_model %>%
        x = "Number of Parameters",
        y = "Accuracy",
        color = "") +
+  geom_hline(yintercept = mean(df_human_items$Aff_correct), 
+             linetype = "dotted", size = 1.2) +
   geom_hline(yintercept = .5, linetype = "dotted") +
   theme_minimal() +
   scale_color_viridis_d() +
@@ -516,8 +651,18 @@ We see clear groups of correlations.
 
 ```{r rq5_model_correlations_overall}
 ### reshape data
+df_human_agg = df_humans %>%
+  mutate(version = image_condition) %>%
+  group_by(session_id) %>%
+  mutate(response_z = scale(response)) %>%
+  group_by(condition, group_id, version) %>%
+  summarise(response_z = mean(response_z)) %>%
+  mutate(model_name = "Human") %>%
+  mutate(prompt_type = "implicit")
+
 df_wide = df_merged %>%
   select(group_id, model_name, condition, version, prompt_type, response_z) %>%
+  bind_rows(df_human_agg) %>%
   unnest(version) %>%
   pivot_wider(names_from = c(model_name),
               values_from = response_z)
